@@ -1,0 +1,243 @@
+= Restauro di Pixel Art
+:imagesdir: img
+:sectnums:
+:table-caption: Tabella
+:figure-caption: Figura
+:toc: macro
+:toclevels: 2
+:toc-title: Indice
+
+// TODO make this pretty
+Rocco Rusponi, Studente di Laurea Magistrale in Informatica
+Progetto per l'esame di Multimedia, A.A. 2025/2026
+
+<<<
+toc::[]
+
+<<<
+== Introduzione
+Le _pixel art_ sono immagini a bassa risoluzione che l'artista disegna
+pixel per pixel. Per pubblicare questi contenuti su _social media_ che
+danno priorità ad immagini realistiche, l'artista deve necessariamente
+applicare un'operazione di scala _Nearest-Neighbor_ per evitare che la
+compressione JPEG distrugga l'opera.
+
+Generare un'immagine pubblicabile a partire dalla _pixel art_ originale
+è banale: si applica una scala, poi si codifica in JPEG. Ricostruire la
+_pixel art_ originale, problema ben più complesso, è l'obiettivo del mio
+progetto.
+
+È comune vedere _pixel art_ pubblicate con una rotazione, magari
+inserite in un contesto in cui sono presenti altri oggetti _pixel art_.
+Il mio algoritmo lo tiene in considerazione, cercando di raddrizzare
+l'immagine prima di estrarre i pixel.
+
+=== Terminologia
+Nel documento, mi riferirò a _macro pixel_ per indicare quei blocchi che
+nell'originale erano singoli pixel, ma nell'immagine pubblicata
+diventano blocchi.
+
+<<<
+== Algoritmo di restauro
+L'algoritmo è suddiviso nelle seguenti fasi:
+
+- Trovare l'angolo di rotazione dell'immagine
+- Raddrizzare l'immagine in base all'angolo
+- Trovare la griglia di macro pixel
+- Sistemare la griglia (linee mancanti, linee duplicate...)
+- Ricostruire l'immagine estraendo colori dai macro pixel
+
+'''
+
+I risultati delle varie operazioni saranno mostrati su questa immagine
+di esempio:
+
+image::0.png[pdfwidth=196,align="center"]
+
+<<<
+=== Raddrizzare l'immagine
+Per stimare l'angolo di rotazione della _pixel art_, vengono prima
+ricercate linee rette nell'immagine:
+
+[source]
+----
+gray := RGB_to_Gray(input)
+
+edges := Canny(gray, T_low=100, T_high=200)
+
+lines := HoughLinesP(
+    edges,
+    rho=1,
+    theta=1°,
+    threshold=50,
+    min_line_length=50,
+    max_line_gap=10)
+----
+
+image:1.png[pdfwidth=196]
+image:2.png[pdfwidth=196]
+
+Una volta trovate le linee rette, si calcolano gli angoli di queste e si
+sceglie il valore _mediano_ come stima provvisoria dell'angolo:
+
+[source]
+----
+angles := [ arctan2(y2-y1, x2-x1) ] for (x1,y1,x2,y2) in lines
+
+guess := Median(angles)
+----
+
+Ora, le _pixel art_ possono essere orientate in 4 modi ugualmente
+corretti, cioè [0, 90, 180, 270] gradi. L'immagine potrebbe quindi
+essere raddrizzata ruotandola di (guess + 90 * k). Tra questi quattro
+candidati, normalizzati in [-180, +180] viene scelto l'angolo con valore
+assoluto più piccolo, cioè l'angolo che mantiene l'immagine più vicina a
+quanto l'artista ha pubblicato.
+
+image::3.png[pdfwidth=160,align="center"]
+
+=== Trovare la griglia di pixel
+Ammesso che il raddrizzamento dell'immagine sia avvenuto con successo,
+ci si aspetta che la griglia di macro pixel sia parallela agli assi _x_
+ed _y_ dell'immagine.
+
+Si prepara l'immagine per l'_edge detection_ applicando uno _stretch_
+del contrasto (normalizzazione dei canali RGB) e un filtro di _Blur
+Gaussiano_ che diminuisce il rumore dovuto a JPEG.
+
+[source]
+----
+stretched := StretchContrast(input)
+gray      := RGB_to_Gray(stretched)
+blurred   := GaussianBlur(gray, kernel=3*3, sigmaX=0)
+----
+
+image::4.png[pdfwidth=160,align="center"]
+
+Vengono poi applicati _edge detection_ e _straight line detection_. Da
+notare come, nel codice a seguire, le _threshold_ sono relativamente
+basse. Questo perché è preferibile trovare molte linee ed eventualmente
+rimuovere quelle in più, invece di trovarne poche e dover aggiungere
+quelle mancanti.
+
+[source]
+----
+edges := Canny(gray, T_low=30, T_high=50)
+
+lines := HoughLinesP(
+    edges,
+    rho=1,
+    theta=90°, <--- cerca solo linee orizzontali/verticali
+    threshold=15,
+    min_line_length=5,
+    max_line_gap=10)
+----
+
+Così facendo, vengono trovati vari segmenti orizzontali e verticali. Per
+costruire una griglia completa, questi segmenti vengono allungati a
+lunghezza infinita. Si separano linee orizzontali e verticali in
+`lines_y` e `lines_x`.
+
+image:5.png[pdfwidth=130]
+image:6.png[pdfwidth=130]
+image:7.png[pdfwidth=130]
+
+=== Sistemare la griglia
+La griglia ottenuta con i passaggi precedenti è imperfetta: alcune linee
+mancano, altre sono duplicate o venute fuori dal rumore.
+
+==== Stimare la grandezza dei macro pixel
+Prima di tutto, serve determinare quanto grandi sono i macro pixel.
+Un'ottima stima della grandezza è la più comune distanza tra una linea
+della griglia e la successiva. In pseudocodice:
+
+[source]
+----
+diff_x := [ lines_x[i] - lines_x[i-1] ] for i=1 to lines_x.len-1
+diff_y := [ lines_y[i] - lines_y[i-1] ] for i=1 to lines_y.len-1
+
+RemoveItems(diff_x, 1) # ignore distances of 1px
+RemoveItems(diff_y, 1) # caused by duplicated lines
+
+size_x = MostCommon(diff_x)
+size_y = MostCommon(diff_y)
+----
+
+Da notare che, come scelta progettuale, i macro pixel non sono
+necessariamente quadrati: l'algoritmo riconosce _pixel art_ che sono
+state scalate con fattori di scala _x_ ed _y_ diversi.
+
+==== Deduplicare linee
+La deduplicazione delle linee della griglia è un operazione iterativa
+che riguarda tre linee alla volta: nel descrivere questa fase, le
+chiamerò _linea 0_, _linea 1_ e _linea 2_.
+
+Si vuole determinare se una delle due linee sia superflua. Ad ogni
+iterazione, si calcolano le distanze tra le linee 0-1 e 0-2:
+
+[source]
+----
+dist_to_1 := lines[i + 1] - lines[i]
+dist_to_2 := lines[i + 2] - lines[i]
+
+blocks_to_1 := Round(dist_to_1 / pixel_size)
+blocks_to_2 := Round(dist_to_2 / pixel_size)
+----
+
+Se `blocks_to_1` vale 0, allora la linea 1 è troppo vicina alla linea 0,
+quindi va rimossa:
+
+[source]
+----
+if blocks_to_1 == 0:
+    Delete(lines[i + 1])
+----
+
+Se invece la distanza in blocchi tra le linee 0-1 è significativa, si
+confronta con la distanza in blocchi tra le linee 0-2. Se entrambe le
+distanze in blocchi si arrotondano allo stesso numero, ciò vuol dire che
+una delle due linee è un duplicato. In tal caso, si elimina la linea più
+lontana dal confine ideale.
+
+[source]
+----
+if (blocks_to_1 > 0) AND (blocks_to_1 == blocks_to_2):
+    ideal_line := lines[i] + blocks_to_1 * pixel_size
+
+    error_1 := Abs(lines[i + 1] - ideal_line)
+    error_2 := Abs(lines[i + 2] - ideal_line)
+
+    if error_1 > error_2:
+        Delete(lines[i + 1]
+    else:
+        Delete(lines[i + 2]
+----
+
+==== Aggiungere linee mancanti
+Dopo aver deduplicato le linee della griglia, aggiungere quelle mancanti
+è relativamente semplice. Si itera su tutte le linee e, se la distanza
+tra due consecutive è troppo grande, si aggiungono tante linee quante se
+ne stimano mancanti.
+
+[source]
+----
+for i = 1 to lines.len - 1
+    dist   := lines[i] - lines[i - 1]
+    blocks := round(dist / pixel_size)
+
+    for b = 1 to blocks - 1:
+        Append(lines, lines[i] + pixel_size * b)
+----
+
+Ecco la griglia finale costruita sull'immagine di esempio:
+
+image::8.png[pdfwidth=172,align="center"]
+
+<<<
+=== Estrarre i pixel
+
+<<<
+== Valutazione dell'algoritmo
+
+<<<
+== Interfaccia a riga di comando

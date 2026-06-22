@@ -1,0 +1,105 @@
+extends: base
+
+font-catalog:
+  merge: true
+  Noto Sans:
+    normal: GEM_FONTS_DIR/notosans-regular-subset.ttf
+    bold: GEM_FONTS_DIR/notosans-bold-subset.ttf
+    italic: GEM_FONTS_DIR/notosans-italic-subset.ttf
+    bold_italic: GEM_FONTS_DIR/notosans-bold_italic-subset.ttf
+  Noto Serif:
+    normal: GEM_FONTS_DIR/notoserif-regular-subset.ttf
+    bold: GEM_FONTS_DIR/notoserif-bold-subset.ttf
+    italic: GEM_FONTS_DIR/notoserif-italic-subset.ttf
+    bold_italic: GEM_FONTS_DIR/notoserif-bold_italic-subset.ttf
+
+page:
+  background-color: 'ffffff'
+  margin: 3.5cm
+  size: A4
+
+base:
+  text-align: justify
+  font-color: '000000'
+  font-family: Noto Sans
+  font-style: normal
+  font-size: 12
+  line-height: 1.4
+
+link-font-color: $base-font-color
+prose-margin-bottom: $base-font-size
+
+heading:
+  font-family: Noto Serif
+  font-style: bold
+  h2-font-size: 18
+  h3-font-size: 16
+  h4-font-size: 14
+  h5-font-size: 12
+  line-height: 1.15
+  margin-top: 8
+  margin-bottom: 8
+
+list:
+  indent: 24
+  item-spacing: 0
+
+description-list:
+  description-indent: $list-indent
+  term-spacing: $list-item-spacing
+  term-font-style: bold
+
+ulist-marker:
+  font-style: bold
+
+thematic-break:
+  border-color: 'aaaab0'
+  border-width: 1
+  padding: 12
+
+codespan:
+  font-color: '000088'
+  #font-family: DejaVu Sans Mono
+  font-size: 11
+
+code:
+  background-color: 'f8f8ff'
+  border-color: 'aaaab0'
+  #font-family: DejaVu Sans Mono
+  font-size: 10
+  line-height: 1.1
+  border-style: solid
+  border-width: 1
+  border-radius: 6
+  padding: 5
+
+table:
+  background-color: 'f8f8ff'
+  border-color: 'aaaab0'
+  border-style: solid
+  border-width: 1
+  cell-padding: [3, 6]
+  head:
+    border-bottom-width: 1
+    font-style: bold
+
+toc:
+  indent: 24
+  line-height: 1.5
+  font-size: 13
+
+footnotes:
+  font-size: 9.5
+  item-spacing: 6
+
+footer:
+  height: 30
+  font-size: 11
+  recto:
+    left-content: ''
+    center-content: ''
+    right-content: '{page-number}'
+  verso:
+    left-content: ''
+    center-content: ''
+    right-content: '{page-number}'
