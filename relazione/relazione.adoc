@@ -61,7 +61,7 @@ ricercate linee rette nell'immagine:
 
 [source]
 ----
-gray := RGB_to_Gray(input)
+gray := RGB_to_Gray(input_img)
 
 edges := Canny(gray, T_low=100, T_high=200)
 
@@ -107,7 +107,7 @@ Gaussiano_ che diminuisce il rumore dovuto a JPEG.
 
 [source]
 ----
-stretched := StretchContrast(input)
+stretched := StretchContrast(input_img)
 gray      := RGB_to_Gray(stretched)
 blurred   := GaussianBlur(gray, kernel=3*3, sigmaX=0)
 ----
@@ -235,6 +235,42 @@ image::8.png[pdfwidth=172,align="center"]
 
 <<<
 === Estrarre i pixel
+La griglia costruita identifica _w_ * _h_ celle che (se la griglia è
+adeguata) coincidono con i macro pixel. La dimensione dell'immagine in
+output, cioè la pixel art ricostruita, si ottengono facilmente così:
+
+[source]
+----
+w := lines_y.len - 1
+h := lines_x.len - 1
+----
+
+Per estrarre i colori, viene calcolata la media di un'area centrata in
+ciascuna di queste celle della griglia. Per evitare il più possibile di
+contaminare la media con rumore dovuto a JPEG, l'area selezionata è più
+piccola della cella.
+
+[source]
+----
+for index_x = 1 to lines_x.len - 1:
+    x0 := lines_x[index_x - 1]
+    x1 := lines_x[index_x]
+    margin_x := Floor((x1 - x0) / 3)
+
+    for index_y = 1 to lines_y.len - 1:
+        y0 := lines_y[index_y - 1]
+        y1 := lines_y[index_y]
+        margin_y := Floor((y1 - y0) / 3)
+
+        area := Crop(input_img,
+            x0 + margin_x, y0 + margin_y,
+            x1 - margin_x, y1 - margin_y)
+
+        color := Mean(area)
+        output_img[index_y, index_x] := color
+----
+
+image::9.png[pdfwidth=180,align="center"]
 
 <<<
 == Valutazione dell'algoritmo
