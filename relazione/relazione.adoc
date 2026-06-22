@@ -277,3 +277,32 @@ image::9.png[pdfwidth=180,align="center"]
 
 <<<
 == Interfaccia a riga di comando
+Lo script Python che implementa l'algoritmo presenta una semplice
+interfaccia a riga di comando:
+
+[source]
+----
+restore-pixel-art [-I] [-o OUTPUT] input_img
+----
+
+Opzione _-I_::
+Esegue lo script in modalità interattiva, mostrando tramite finestre i
+risultati intermedi dell'algoritmo.
+
+Opzione _-o_::
+Se inserita, questa opzione permette di salvare l'immagine ricostruita
+su un file dal nome scelto. Si raccomanda il formato _PNG_.
+
+Argomento _input_img_::
+Specifica il file immagine di input.
+
+'''
+
+Ad esempio:
+
+[source]
+----
+./restore-pixel-art examples/knight.jpg -I
+
+./restore-pixel-art examples/knight.jpg -o out.png
+----
