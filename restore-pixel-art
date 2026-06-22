@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+
+# Copyright 2026 Vulcalien
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+import cv2
+import sys, math
+import numpy as np
+import argparse
+
+RGB_SIMILARITY_THRESHOLD = 5
+
+GRID_COLOR = (0, 0, 0)
+WINDOW_TARGET_SIZE = 800
+windows = []
+
+# ==================================================================== #
+#                               Utility                                #
+# ==================================================================== #
+
+def stretch_contrast(img):
+    normalized = np.zeros(img.shape, np.uint8)
+    return cv2.normalize(img, normalized, 0, 255, cv2.NORM_MINMAX)
+
+def draw_grid(img, xs, ys):
+    h, w = img.shape[:2]
+    output = img.copy()
+    for x in xs:
+        cv2.line(output, (x, 0), (x, h - 1), GRID_COLOR, 1)
+    for y in ys:
+        cv2.line(output, (0, y), (w - 1, y), GRID_COLOR, 1)
+    return output
+
+def display(name, img):
+    img = img.copy()
+    h, w = img.shape[:2]
+    if h < WINDOW_TARGET_SIZE and w < WINDOW_TARGET_SIZE:
+        scale = min(WINDOW_TARGET_SIZE // w, WINDOW_TARGET_SIZE // h)
+        img = cv2.resize(
+            img, (w * scale, h * scale),
+            interpolation=cv2.INTER_NEAREST
+        )
+    windows.append( (name, img) )
+
+# ==================================================================== #
+#                        Functions for rotation                        #
+# ==================================================================== #
+
+def get_rotation_angle(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 100, 200)
+
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180, # 1 degree resolution
+        threshold=50,
+        minLineLength=50,
+        maxLineGap=10
+    )
+
+    # guess the rotation by taking the median angle of detected lines
+    guess = np.median([
+        np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        for x1, y1, x2, y2 in lines[:, 0]
+    ])
+
+    # select smallest rotation among (guess + k * 90)
+    candidates = np.array([ guess + x for x in (0, 90, 180, 270) ])
+    candidates = (candidates + 180) % 360 - 180 # normalize angles
+    return candidates[ np.argmin(np.abs(candidates)) ]
+
+def rotate(img, angle):
+    print('Rotation angle:', angle)
+
+    # TODO rotate and make sure it fits (see fruit2.png example)
+    h, w = img.shape[:2]
+    center = (w / 2, h / 2)
+    matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    return cv2.warpAffine(img, matrix, (w, h))
+
+# ==================================================================== #
+#                     Functions to find pixel grid                     #
+# ==================================================================== #
+
+def estimate_pixel_size(xs, ys):
+    xdiff = [ xs[i + 1] - xs[i] for i in range(len(xs) - 1) ]
+    ydiff = [ ys[i + 1] - ys[i] for i in range(len(ys) - 1) ]
+
+    # ignore differences caused by duplicated lines (1px)
+    xdiff = [ val for val in xdiff if val > 1 ]
+    ydiff = [ val for val in ydiff if val > 1 ]
+
+    size_x = np.argmax(np.bincount(xdiff))
+    size_y = np.argmax(np.bincount(ydiff))
+    return size_x, size_y
+
+def deduplicate_lines(lines, pixel_size):
+    i = 0
+    while i < len(lines) - 2:
+        dist_to_1st = lines[i + 1] - lines[i]
+        dist_to_2nd = lines[i + 2] - lines[i] # skip lines[i + 1]
+
+        blocks_to_1st = round(dist_to_1st / pixel_size)
+        blocks_to_2nd = round(dist_to_2nd / pixel_size)
+
+        if blocks_to_1st == 0:
+            # the next line is too close to be a pixel boundary
+            del lines[i + 1]
+        elif blocks_to_1st == blocks_to_2nd:
+            # the two overlapping gaps define the same pixel boundary:
+            # only keep the line closest to the ideal boundary
+            error_1st = abs(dist_to_1st - blocks_to_1st * pixel_size)
+            error_2nd = abs(dist_to_2nd - blocks_to_1st * pixel_size)
+
+            if error_1st > error_2nd:
+                del lines[i + 1]
+            else:
+                del lines[i + 2]
+        else:
+            # the two lines define different pixel boundaries: keep both
+            i += 1
+    return lines
+
+def add_missing_lines(lines, pixel_size):
+    for i in range(len(lines) - 1):
+        dist_to_next   = lines[i + 1] - lines[i]
+        blocks_to_next = round(dist_to_next / pixel_size)
+
+        for b in range(1, blocks_to_next):
+            lines.append(int(lines[i] + pixel_size * b))
+    return sorted(lines)
+
+def grid_fixup(xs, ys):
+    pixel_size = estimate_pixel_size(xs, ys)
+    print('Pixel Size:', *pixel_size)
+
+    xs = deduplicate_lines(xs, pixel_size[0])
+    ys = deduplicate_lines(ys, pixel_size[1])
+
+    xs = add_missing_lines(xs, pixel_size[0])
+    ys = add_missing_lines(ys, pixel_size[1])
+
+    return xs, ys
+
+def find_grid_lines(img):
+    stretched = stretch_contrast(img)
+    gray      = cv2.cvtColor(stretched, cv2.COLOR_BGR2GRAY)
+    blurred   = cv2.GaussianBlur(gray, (3, 3), 0) # reduce JPEG noise
+    edges     = cv2.Canny(blurred, 30, 50)
+    display('Edges', edges)
+
+    # look for horizontal/vertical lines in the edges image
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 2, # 90 degrees resolution
+        threshold=15,
+        minLineLength=5,
+        maxLineGap=10
+    )
+
+    # collect coordinates of horizontal/vertical lines
+    xs = sorted({ x1 for x1, y1, x2, y2 in lines[:, 0] if x1 == x2 })
+    ys = sorted({ y1 for x1, y1, x2, y2 in lines[:, 0] if y1 == y2 })
+    display('Pixel Grid (before fixup)', draw_grid(img, xs, ys))
+
+    # fix grid lines
+    xs, ys = grid_fixup(xs, ys)
+    display('Pixel Grid', draw_grid(img, xs, ys))
+
+    return xs, ys
+
+# ==================================================================== #
+#                     Functions to extract pixels                      #
+# ==================================================================== #
+
+def extract_pixels(img, xs, ys):
+    w = len(ys) - 1
+    h = len(xs) - 1
+    output = np.zeros( (w, h, 3), np.uint8)
+    print('Output size:', w, h)
+
+    # iterate over grid lines and extract color between them
+    for xindex in range(len(xs) - 1):
+        margin_x = (xs[xindex + 1] - xs[xindex]) // 3
+        x0 = xs[xindex]     + margin_x
+        x1 = xs[xindex + 1] - margin_x
+
+        for yindex in range(len(ys) - 1):
+            margin_y = (ys[yindex + 1] - ys[yindex]) // 3
+            y0 = ys[yindex]     + margin_y
+            y1 = ys[yindex + 1] - margin_y
+
+            # calculate the average RGB values within the block
+            cropped_block = img[y0:y1, x0:x1]
+            output[yindex, xindex] = cv2.mean(cropped_block)[:-1]
+    return output
+
+def reduce_palette(img):
+    palette = list(np.unique(img.reshape(-1, img.shape[-1]), axis=0))
+
+    # cluster similar colors together
+    groups = [ [palette.pop()] ]
+    while len(palette) > 0:
+        color = palette.pop()
+
+        # check if color belongs in any existing group
+        for group in groups:
+            mean = np.mean(group, axis=0)
+            if np.all(np.abs(color - mean) < RGB_SIMILARITY_THRESHOLD):
+                group.append(color)
+                break
+        else:
+            # no suitable group was found: create a new one
+            groups.append( [color] )
+
+    # map colors to the mean RGB values of the group they belong to
+    color_map = {
+        tuple(color): np.round(np.mean(group, axis=0)).astype(np.uint8)
+        for group in groups for color in group
+    }
+
+    # replace colors in image
+    output = np.zeros(img.shape, np.uint8)
+    for y in range(img.shape[0]):
+        for x in range(img.shape[1]):
+            pix = tuple(img[y, x])
+            output[y, x] = color_map[pix]
+    return output
+
+# ==================================================================== #
+#                            Main Execution                            #
+# ==================================================================== #
+
+parser = argparse.ArgumentParser(description='Restore Pixel Art images')
+parser.add_argument('input_img',
+                    help='specify the input file')
+parser.add_argument('-I', '--interactive',
+                    action=argparse.BooleanOptionalAction,
+                    help='show steps of the algorithm visually')
+parser.add_argument('-o', '--output', default=None,
+                    help='specify the output file')
+args = parser.parse_args()
+
+# load original image
+original = cv2.imread(args.input_img)
+display('Original', original)
+
+try:
+    # estimate rotation angle, then rotate the image
+    rotated = rotate(original, get_rotation_angle(original))
+
+    # find lines of the pixel grid
+    xs, ys = find_grid_lines(rotated)
+
+    # extract pixels by looking at colors between grid lines
+    result = extract_pixels(rotated, xs, ys)
+
+    # reduce number of colors by merging similar ones (reduces noise)
+    # result = reduce_palette(result)
+    display('Result', result)
+except:
+    print('Failed to restore image')
+
+if args.output:
+    cv2.imwrite(args.output, result)
+
+if args.interactive:
+    for name, img in windows:
+        cv2.imshow(name, img)
+
+    while True:
+        # check if any window is still visible
+        for win in windows:
+            if cv2.getWindowProperty(win[0], cv2.WND_PROP_VISIBLE) >= 1:
+                break
+        else:
+            break # no window is visible, exit
+
+        # if a key is pressed, exit
+        if cv2.waitKey(20) in range(ord('a'), ord('z')):
+            break
+    cv2.destroyAllWindows()
