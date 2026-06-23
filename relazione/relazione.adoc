@@ -90,9 +90,9 @@ guess := Median(angles)
 Ora, le _pixel art_ possono essere orientate in 4 modi ugualmente
 corretti, cioè [0, 90, 180, 270] gradi. L'immagine potrebbe quindi
 essere raddrizzata ruotandola di (guess + 90 * k). Tra questi quattro
-candidati, normalizzati in [-180, +180] viene scelto l'angolo con valore
-assoluto più piccolo, cioè l'angolo che mantiene l'immagine più vicina a
-quanto l'artista ha pubblicato.
+candidati, normalizzati in [-180, +180], viene scelto l'angolo con
+valore assoluto più piccolo, cioè l'angolo che mantiene l'immagine più
+vicina a quanto l'artista ha pubblicato.
 
 image::3.png[pdfwidth=160,align="center"]
 
