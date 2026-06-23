@@ -274,6 +274,7 @@ try:
     display('Result', result)
 except:
     print('Failed to restore image')
+    sys.exit()
 
 if args.output:
     cv2.imwrite(args.output, result)
