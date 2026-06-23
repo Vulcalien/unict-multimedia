@@ -295,3 +295,5 @@ if args.interactive:
         if cv2.waitKey(20) in range(ord('a'), ord('z')):
             break
     cv2.destroyAllWindows()
+
+# TODO maybe add padding to better catch pixels at the borders?
