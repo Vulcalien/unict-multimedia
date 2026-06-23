@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+
+# Copyright 2026 Vulcalien
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+import cv2
+import sys, os, math
+import numpy as np
+
+# original = cv2.imread(sys.argv[1])
+# restored = cv2.imread(sys.argv[2])
+
+def evaluate(original, restored):
+    w = max(original.shape[1], restored.shape[1])
+    h = max(original.shape[0], restored.shape[0])
+
+    # add padding to original
+    if original.shape[0] < h or original.shape[1] < w:
+        original = cv2.copyMakeBorder(original,
+            max(0, math.floor((h - original.shape[0]) / 2)),
+            max(0, math.ceil((h - original.shape[0]) / 2)),
+            max(0, math.floor((w - original.shape[1]) / 2)),
+            max(0, math.ceil((w - original.shape[1]) / 2)),
+            borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0))
+
+    # add padding to restored
+    if restored.shape[0] < h or restored.shape[1] < w:
+        restored = cv2.copyMakeBorder(restored,
+            max(0, math.floor((h - restored.shape[0]) / 2)),
+            max(0, math.ceil((h - restored.shape[0]) / 2)),
+            max(0, math.floor((w - restored.shape[1]) / 2)),
+            max(0, math.ceil((w - restored.shape[1]) / 2)),
+            borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0))
+
+    # calculate MSE
+    error = [ 0, 0, 0 ]
+    for y in range(h):
+        for x in range(w):
+            diff = original[y, x] - restored[y, x]
+            error += diff ** 2
+    error = error / (w * h)
+    return np.mean(error)
+
+list_of_files = open(sys.argv[1])
+failures  = 0
+errors = []
+for file in list_of_files:
+    file = file.strip('\n')
+    original = cv2.imread(file)
+
+    restored_file = file.strip('.png') + '-restored.png'
+    if not os.path.isfile(restored_file):
+        failures += 1
+    else:
+        restored = cv2.imread(restored_file)
+        errors.append(evaluate(original, restored))
+
+success_rate = (1 - failures / (len(errors) + failures)) * 100
+print('Success Rate: %f' % success_rate)
+print('MSE: %f' % np.mean(errors))

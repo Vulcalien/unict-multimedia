@@ -7,6 +7,7 @@ all:
 
 setup: | images
 	find download -type f -name "*.zip" -exec unzip -ud images {} \;
+	find images -type f -name "*.png" > list-of-files
 	find images -type f -name "*.png" -exec sh -c '\
 		ffmpeg -loglevel 0 -y -i "$$1"\
 		-q:v $(JPEG_QF)\
@@ -17,12 +18,12 @@ setup: | images
 	find images -type f -name "*.jpg" -exec sh -c '\
 		../restore-pixel-art -o "$${1%.jpg}-restored.png" "$$1"\
 		' sh {} \;
+	./results list-of-files
 
 retrieve: | download
 	wget -O download/1.zip https://opengameart.org/sites/default/files/gfx_3.zip
 	wget -O download/2.zip https://opengameart.org/sites/default/files/Icons.zip
-	wget -O download/3.zip https://opengameart.org/sites/default/files/lpc_entry.zip
-	wget -O download/4.zip https://opengameart.org/sites/default/files/assets_3.zip
+	wget -O download/3.zip https://opengameart.org/sites/default/files/assets_3.zip
 
 download images:
 	mkdir -p $@
