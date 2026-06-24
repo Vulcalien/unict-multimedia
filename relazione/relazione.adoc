@@ -11,6 +11,10 @@
 Rocco Rusponi, Studente di Laurea Magistrale in Informatica
 Progetto per l'esame di Multimedia, A.A. 2025/2026
 
+Docenti D. Allegra, F. Stanco.
+
+Codice su GitHub: https://github.com/Vulcalien/unict-multimedia
+
 <<<
 toc::[]
 
