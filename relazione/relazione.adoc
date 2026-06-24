@@ -299,10 +299,10 @@ dimensione minore, mantenendo il contenuto al centro.
 
 Nelle due tabelle a seguire, sono indicati _MSE_ e _tasso di successo_.
 Il tasso di successo è la percentuale di immagini JPEG dalle quali
-l'algoritmo è riuscito a estrarre una qualche immagine (l'algoritmo può
-fallire se non riesce a ricostruire la griglia di pixel). I valori sono
-ottenuti variando _quality factor_ e fattore di scala durante la
-conversione a JPEG.
+l'algoritmo è riuscito a estrarre una qualche immagine (può fallire se
+non riesce a ricostruire la griglia di pixel). I valori sono ottenuti
+variando _quality factor_ e fattore di scala durante la conversione a
+JPEG.
 
 .MSE al variare di quality factor e scala
 [%unbreakable]
