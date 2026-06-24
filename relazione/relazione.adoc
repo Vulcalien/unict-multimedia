@@ -274,6 +274,81 @@ image::9.png[pdfwidth=180,align="center"]
 
 <<<
 == Valutazione dell'algoritmo
+Per misurare le prestazioni dell'algoritmo, è stato creato un piccolo
+dataset di 88 immagini, prese dai seguenti pacchetti sul sito
+_opengameart.org_:
+
+- https://opengameart.org/content/zelda-like-tilesets-and-sprites
+- https://opengameart.org/content/pixelart-icons
+- https://opengameart.org/content/surtizens
+- https://opengameart.org/content/bosses-pixel-art-sprite-sheet
+
+Le immagini originali vengono prima ingrandite con algoritmo _Nearest
+Neighbor_ con un certo fattore di scala. Si aggiunge poi un bordo nero
+di 8 pixel per aiutare l'algoritmo di restauro a non perdere contenuti
+ai lati. Infine, vengono convertite in formato JPEG.
+
+Si esegue l'algoritmo di restauro sulle immagini JPEG e, se questo
+riesce a generare un risultato, si confronta questa immagine con
+l'originale calcolando il _Mean Square Error_ tra le due.
+
+Le immagini originale e ricostruita potrebbero avere dimensioni diverse:
+il background non viene sempre incluso per intero. Per poter comunque
+confrontare le due, si aggiunge _padding_ di pixel neri a quella con
+dimensione minore, mantenendo il contenuto al centro.
+
+Nelle due tabelle a seguire, sono indicati _MSE_ e _tasso di successo_.
+Il tasso di successo è la percentuale di immagini JPEG dalle quali
+l'algoirtmo è riuscito a estrarre una qualche immagine (l'algoritmo può
+fallire se non riesce a ricostruire la griglia di pixel). I valori sono
+ottenuti variando _quality factor_ e fattore di scala durante la
+conversione a JPEG.
+
+.MSE al variare di quality factor e scala
+[%unbreakable]
+|===
+|| 6+^.^|Quality Factor
+
+||       |*30*  |*50*  |*70*  |*80*  |*90*  |*100*
+.5+^.^|*Scala*
+^.^|*2*  |33.99 |35.18 |35.41 |34.39 |37.59 |34.96
+^.^|*3*  |38.35 |39.49 |39.77 |36.88 |35.43 |34.38
+^.^|*5*  |42.09 |39.96 |40.93 |39.96 |36.09 |34.49
+^.^|*8*  |34.31 |34.51 |33.48 |33.19 |30.47 |30.47
+^.^|*10* |36.85 |35.44 |34.71 |35.60 |33.39 |32.35
+|===
+
+{empty} +
+
+.Tasso di successo dell'algoritmo nel generare un'immagine
+[%unbreakable]
+|===
+|| 6+^.^|Quality Factor
+
+||       |*30*  |*50*  |*70*  |*80*  |*90*  |*100*
+.5+^.^|*Scala*
+^.^|*2*  |59.1% |53.4% |53.4% |52.3% |47.7% |52.3%
+^.^|*3*  |70.5% |67.0% |68.2% |69.3% |68.2% |67.0%
+^.^|*5*  |75.0% |75.0% |75.0% |75.0% |76.1% |79.5%
+^.^|*8*  |70.5% |88.6% |88.6% |89.8% |87.5% |87.5%
+^.^|*10* |89.8% |89.8% |89.8% |88.6% |89.8% |90.9%
+|===
+
+{empty} +
+
+Dai dati sembrano emergere alcuni pattern:
+
+- Il tasso di successo dipende principalmente dal fattore di scala.
+- Il valore _MSE_ diminuisce all'aumentare del _quality factor_.
+- Tra i parametri testati, l'algoritmo si comporta meglio con fattore di
+  scala 8.
+
+<<<
+
+Riguardo a quest'ultimo punto, ci si potrebbe aspettare che, visto che
+JPEG usa blocchi 8x8, avere macro blocchi della stessa dimensione
+diminuisce drasticamente il rumore introdotto, abbassando il valore
+_MSE_ di conseguenza.
 
 <<<
 == Interfaccia a riga di comando
